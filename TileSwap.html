@@ -37,9 +37,8 @@
 </body>
 
 <script>
-var tileElements = [];
-var emptyTileImage, dotImage;
 var puzzleModel;
+var puzzleViewer;
 
 function PuzzleModel(numCols, numRows) {
     this.numCols = numCols;
@@ -70,6 +69,10 @@ PuzzleModel.prototype.isSolved = function() {
     return true;
 }
 
+PuzzleModel.prototype.tileAt = function(tileIndex) {
+    return this.tiles[tileIndex];
+}
+
 PuzzleModel.prototype.canSwapTiles = function(t1, t2) {
     var sum = this.tiles[t1] + this.tiles[t2];
     return (sum % 3) == 0 || (sum % 5) == 0;
@@ -90,35 +93,53 @@ PuzzleModel.prototype.trySwapTiles = function(t1, t2) {
     return false;
 }
 
-function initTileElements() {
+function PuzzleViewer(puzzleModel, emptyTileImage, dotImage) {
+    this.model = puzzleModel;
+    this.tileElements = [];
+    this.emptyTileImage = emptyTileImage;
+    this.dotImage = dotImage;
+
+    this.dotPositions = [
+        [4],
+        [0, 8],
+        [0, 4, 8],
+        [0, 2, 6, 8]
+    ];
+    this.dotTileSep = 13;
+    this.dotMod = 3;
+
+    this.initTileElements();
+}
+
+PuzzleViewer.prototype.initTileElements = function() {
     var i;
-    for (i = 0; i < puzzleModel.numTiles; i++) {
-        tileElements[i] = document.getElementById("tile" + i);
+    for (i = 0; i < this.model.numTiles; i++) {
+        this.tileElements[i] = document.getElementById("tile" + i);
     }
 }
 
-var dotPositions = [
-    [4],
-    [0, 8],
-    [0, 4, 8],
-    [0, 2, 6, 8]
-];
-var dotTileSep = 13;
-var dotMod = 3;
-function drawTile(tileIndex) {
-    var canvas = tileElements[tileIndex];
+PuzzleViewer.prototype.drawTile = function(tileIndex) {
+    var canvas = this.tileElements[tileIndex];
     var ctx = canvas.getContext("2d");
-    ctx.drawImage(emptyTileImage, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(this.emptyTileImage, 0, 0, canvas.width, canvas.height);
 
     var i;
-	var dotSep = (canvas.width - 2 * dotTileSep) / (dotMod - 1);
-    var dots = dotPositions[puzzleModel.tiles[tileIndex] - 1];
+	var dotSep = (canvas.width - 2 * this.dotTileSep) / (this.dotMod - 1);
+    var dots = this.dotPositions[this.model.tileAt(tileIndex) - 1];
+    var dotSize = this.dotImage.width;
     for (i = 0; i < dots.length; i++) {
         var dotPos = dots[i];
-		var dotx = dotTileSep + Math.floor(dotPos / dotMod) * dotSep - dotImage.width / 2;
-		var doty = dotTileSep + (dotPos % dotMod) * dotSep - dotImage.height / 2;
+		var dotx = this.dotTileSep + Math.floor(dotPos / this.dotMod) * dotSep - dotSize / 2;
+		var doty = this.dotTileSep + (dotPos % this.dotMod) * dotSep - dotSize / 2;
 
-        ctx.drawImage(dotImage, dotx, doty);
+        ctx.drawImage(this.dotImage, dotx, doty);
+    }
+}
+
+PuzzleViewer.prototype.drawPuzzle = function() {
+    var i;
+    for (i = 0; i < this.model.numTiles; i++) {
+        this.drawTile(i);
     }
 }
 
@@ -142,45 +163,32 @@ function preloadImages(srcs, imgs, callback) {
     }
 }
 
-function loadTileImages(callback) {
-    var tilePartImageSources = ["Images/Tile.png", "Images/Dot.png"];
-    var tilePartImages = [];
-
-    preloadImages(tilePartImageSources, tilePartImages, function() {
-        emptyTileImage = tilePartImages[0];
-        dotImage = tilePartImages[1];
-
-        callback();
-    });
-}
-
 function init() {
-    displayStatus("Loading Images");
+    puzzleModel = new PuzzleModel(2, 2);
 
-    loadTileImages(function() {
-        puzzleModel = new PuzzleModel(2, 2);
-        initTileElements();
-        drawPuzzle();
-        displayStatus("Try me!");
-    });
+    displayStatus("Loading Images");
+    var tileImages = [];
+    preloadImages(
+        ["Images/Tile.png", "Images/Dot.png"],
+        tileImages,
+        function() {
+            puzzleViewer = new PuzzleViewer(puzzleModel, tileImages[0], tileImages[1]);
+
+            puzzleViewer.drawPuzzle();
+            displayStatus("Try me!");
+        }
+    );
 }
 
 function resetPuzzle() {
     puzzleModel.reset();
-    drawPuzzle();
+    puzzleViewer.drawPuzzle();
     displayStatus("Try again!");
-}
-
-function drawPuzzle() {
-    var i;
-    for (i = 0; i < puzzleModel.numTiles; i++) {
-        drawTile(i);
-    }
 }
 
 function trySwapTiles(t1, t2) {
     if (puzzleModel.trySwapTiles(t1, t2)) {
-        drawPuzzle();
+        puzzleViewer.drawPuzzle();
         if (puzzleModel.isSolved()) {
             displayStatus("Solved in " + puzzleModel.numMoves + " moves!");
         } else {
@@ -188,6 +196,5 @@ function trySwapTiles(t1, t2) {
         }
     }
 }
-
 </script>
 </html>
