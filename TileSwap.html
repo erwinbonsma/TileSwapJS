@@ -6,29 +6,9 @@
 
 <h1>Puzzle</h1>
 
-<table border="1">
-<tr>
-<td><canvas id="tile0" width="56" height="56"/></td>
-<td><button onclick="trySwapTiles(0, 1)">-</button></td>
-<td><canvas id="tile1" width="56" height="56"/></td>
-</tr>
-<tr>
-<td><button onclick="trySwapTiles(0, 2)">|</button></td>
-<td/>
-<td><button onclick="trySwapTiles(1, 3)">|</button></td>
-</tr>
-<tr>
-<td><canvas id="tile2" width="56" height="56"/></td>
-<td><button onclick="trySwapTiles(2, 3)">-</button></td>
-<td><canvas id="tile3" width="56" height="56"/></td>
-</tr>
-</table>
+<canvas id="puzzleCanvas" width="200" height="200"></canvas>
 
-<!--
-<canvas id="puzzleCanvas" width="200" height="200" />
--->
-
-<p id="status">...</p>
+<p id="status">&nbsp;</p>
 
 <button onclick="resetPuzzle()">Reset</button>
 
@@ -54,7 +34,7 @@ function PuzzleModel(numCols, numRows) {
 PuzzleModel.prototype.reset = function() {
     var i;
     for (i = 0; i < this.numTiles; i++) {
-        this.tiles[i] = this.numTiles - i;
+        this.tiles[i] = this.numTiles - i - 1;
     }
     this.numMoves = 0;
 }
@@ -62,31 +42,35 @@ PuzzleModel.prototype.reset = function() {
 PuzzleModel.prototype.isSolved = function() {
     var i;
     for (i = 0; i < this.numTiles; i++) {
-        if (this.tiles[i] != (i + 1)) {
+        if (this.tiles[i] != i) {
             return false;
         }
     }
     return true;
 }
 
-PuzzleModel.prototype.tileAt = function(tileIndex) {
-    return this.tiles[tileIndex];
+PuzzleModel.prototype.tileAt = function(tilePos) {
+    return this.tiles[tilePos];
 }
 
-PuzzleModel.prototype.canSwapTiles = function(t1, t2) {
-    var sum = this.tiles[t1] + this.tiles[t2];
+PuzzleModel.prototype.tileValueAt = function(tilePos) {
+    return this.tiles[tilePos] + 1;
+}
+
+PuzzleModel.prototype.canSwapTiles = function(tilePos1, tilePos2) {
+    var sum = this.tileValueAt(tilePos1) + this.tileValueAt(tilePos2);
     return (sum % 3) == 0 || (sum % 5) == 0;
 }
 
-PuzzleModel.prototype.swapTiles = function(t1, t2) {
-    var value1 = this.tiles[t1];
-    this.tiles[t1] = this.tiles[t2];
-    this.tiles[t2] = value1;
+PuzzleModel.prototype.swapTiles = function(tilePos1, tilePos2) {
+    var tile1 = this.tiles[tilePos1];
+    this.tiles[tilePos1] = this.tiles[tilePos2];
+    this.tiles[tilePos2] = tile1;
 }
 
-PuzzleModel.prototype.trySwapTiles = function(t1, t2) {
-    if (this.canSwapTiles(t1, t2)) {
-        this.swapTiles(t1, t2);
+PuzzleModel.prototype.trySwapTiles = function(tilePos1, tilePos2) {
+    if (this.canSwapTiles(tilePos1, tilePos2)) {
+        this.swapTiles(tilePos1, tilePos2);
         this.numMoves++;
         return true;
     }
@@ -96,50 +80,66 @@ PuzzleModel.prototype.trySwapTiles = function(t1, t2) {
 function PuzzleViewer(puzzleModel, emptyTileImage, dotImage) {
     this.model = puzzleModel;
     this.tileElements = [];
-    this.emptyTileImage = emptyTileImage;
-    this.dotImage = dotImage;
+    this.tileSprites = [];
 
-    this.dotPositions = [
+    this.initTileSprites(emptyTileImage, dotImage);
+
+    // Constants
+    this.borderTileSep = 30;
+    this.tileDistance = 90;
+}
+
+PuzzleViewer.prototype.initTileSprites = function(emptyTileImage, dotImage) {
+    var dotsForTiles = [
         [4],
         [0, 8],
         [0, 4, 8],
         [0, 2, 6, 8]
     ];
-    this.dotTileSep = 13;
-    this.dotMod = 3;
 
-    this.initTileElements();
-}
-
-PuzzleViewer.prototype.initTileElements = function() {
     var i;
     for (i = 0; i < this.model.numTiles; i++) {
-        this.tileElements[i] = document.getElementById("tile" + i);
-    }
-}
-
-PuzzleViewer.prototype.drawTile = function(tileIndex) {
-    var canvas = this.tileElements[tileIndex];
-    var ctx = canvas.getContext("2d");
-    ctx.drawImage(this.emptyTileImage, 0, 0, canvas.width, canvas.height);
-
-    var i;
-	var dotSep = (canvas.width - 2 * this.dotTileSep) / (this.dotMod - 1);
-    var dots = this.dotPositions[this.model.tileAt(tileIndex) - 1];
-    var dotSize = this.dotImage.width;
-    for (i = 0; i < dots.length; i++) {
-        var dotPos = dots[i];
-		var dotx = this.dotTileSep + Math.floor(dotPos / this.dotMod) * dotSep - dotSize / 2;
-		var doty = this.dotTileSep + (dotPos % this.dotMod) * dotSep - dotSize / 2;
-
-        ctx.drawImage(this.dotImage, dotx, doty);
+        this.tileSprites[i] = new TileSprite(
+            dotsForTiles[i], emptyTileImage, dotImage
+        );
     }
 }
 
 PuzzleViewer.prototype.drawPuzzle = function() {
+    var canvas = document.getElementById("puzzleCanvas");
     var i;
     for (i = 0; i < this.model.numTiles; i++) {
-        this.drawTile(i);
+        var x = this.borderTileSep + (i % this.model.numCols) * this.tileDistance;
+        var y = this.borderTileSep + Math.floor(i / this.model.numCols) * this.tileDistance;
+
+        console.log("Draw tile " + this.model.tileAt(i) + " at " + x + ", " + y);
+        this.tileSprites[this.model.tileAt(i)].draw(canvas, x, y);
+    }
+}
+
+function TileSprite(dots, emptyTileImage, dotImage) {
+    this.dots = dots;
+    this.emptyTileImage = emptyTileImage;
+    this.dotImage = dotImage;
+
+    // Constants
+    this.dotTileSep = 13;
+    this.dotMod = 3;
+}
+
+TileSprite.prototype.draw = function(canvas, x, y) {
+    var ctx = canvas.getContext("2d");
+    ctx.drawImage(this.emptyTileImage, x, y);
+
+    var i;
+	var dotSep = (this.emptyTileImage.width - 2 * this.dotTileSep) / (this.dotMod - 1);
+    var dotSize = this.dotImage.width;
+    for (i = 0; i < this.dots.length; i++) {
+        var dot = this.dots[i];
+		var dotx = this.dotTileSep + Math.floor(dot / this.dotMod) * dotSep - dotSize / 2;
+		var doty = this.dotTileSep + (dot % this.dotMod) * dotSep - dotSize / 2;
+
+        ctx.drawImage(this.dotImage, x + dotx, y + doty);
     }
 }
 
