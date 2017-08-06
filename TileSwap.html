@@ -24,6 +24,10 @@
 </tr>
 </table>
 
+<!--
+<canvas id="puzzleCanvas" width="200" height="200" />
+-->
+
 <p id="status">...</p>
 
 <button onclick="resetPuzzle()">Reset</button>
@@ -33,20 +37,62 @@
 </body>
 
 <script>
-var numCols = 2;
-var numRows = 2;
-var numTiles = numCols * numRows;
-
 var tileElements = [];
-var tiles = [];
-
-var numMoves = 0;
-
 var emptyTileImage, dotImage;
+var puzzleModel;
+
+function PuzzleModel(numCols, numRows) {
+    this.numCols = numCols;
+    this.numRows = numRows;
+    this.numTiles = numCols * numRows;
+    this.numMoves = 0;
+
+    this.tiles = [];
+
+    this.reset();
+}
+
+PuzzleModel.prototype.reset = function() {
+    var i;
+    for (i = 0; i < this.numTiles; i++) {
+        this.tiles[i] = this.numTiles - i;
+    }
+    this.numMoves = 0;
+}
+
+PuzzleModel.prototype.isSolved = function() {
+    var i;
+    for (i = 0; i < this.numTiles; i++) {
+        if (this.tiles[i] != (i + 1)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+PuzzleModel.prototype.canSwapTiles = function(t1, t2) {
+    var sum = this.tiles[t1] + this.tiles[t2];
+    return (sum % 3) == 0 || (sum % 5) == 0;
+}
+
+PuzzleModel.prototype.swapTiles = function(t1, t2) {
+    var value1 = this.tiles[t1];
+    this.tiles[t1] = this.tiles[t2];
+    this.tiles[t2] = value1;
+}
+
+PuzzleModel.prototype.trySwapTiles = function(t1, t2) {
+    if (this.canSwapTiles(t1, t2)) {
+        this.swapTiles(t1, t2);
+        this.numMoves++;
+        return true;
+    }
+    return false;
+}
 
 function initTileElements() {
     var i;
-    for (i = 0; i < numTiles; i++) {
+    for (i = 0; i < puzzleModel.numTiles; i++) {
         tileElements[i] = document.getElementById("tile" + i);
     }
 }
@@ -60,75 +106,24 @@ var dotPositions = [
 var dotTileSep = 13;
 var dotMod = 3;
 function drawTile(tileIndex) {
-    console.log("Drawing tile " + tileIndex + " with value " + tiles[tileIndex]);
     var canvas = tileElements[tileIndex];
     var ctx = canvas.getContext("2d");
     ctx.drawImage(emptyTileImage, 0, 0, canvas.width, canvas.height);
 
     var i;
 	var dotSep = (canvas.width - 2 * dotTileSep) / (dotMod - 1);
-    var dots = dotPositions[tiles[tileIndex] - 1];
+    var dots = dotPositions[puzzleModel.tiles[tileIndex] - 1];
     for (i = 0; i < dots.length; i++) {
         var dotPos = dots[i];
 		var dotx = dotTileSep + Math.floor(dotPos / dotMod) * dotSep - dotImage.width / 2;
 		var doty = dotTileSep + (dotPos % dotMod) * dotSep - dotImage.height / 2;
 
         ctx.drawImage(dotImage, dotx, doty);
-        console.log("  Dot at " + dotx + ", " + doty);
     }
-}
-
-function setTile(tileIndex, value) {
-    tiles[tileIndex] = value;
-    drawTile(tileIndex);
 }
 
 function displayStatus(statusText) {
     document.getElementById("status").innerHTML = statusText;
-}
-
-function setNumMoves(value) {
-    numMoves = value;
-    displayStatus(numMoves + " moves");
-}
-
-function resetPuzzle() {
-    var i;
-    for (i = 0; i < numTiles; i++) {
-        setTile(i, numTiles - i);
-    }
-    setNumMoves(0);
-}
-
-function isPuzzleSolved() {
-    var i;
-    for (i = 0; i < numTiles; i++) {
-        if (tiles[i] != (i + 1)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-function canSwapTiles(t1, t2) {
-    var sum = tiles[t1] + tiles[t2];
-    return (sum % 3) == 0 || (sum % 5) == 0;
-}
-
-function swapTiles(t1, t2) {
-    var value1 = tiles[t1];
-    setTile(t1, tiles[t2]);
-    setTile(t2, value1);
-}
-
-function trySwapTiles(t1, t2) {
-    if (canSwapTiles(t1, t2)) {
-        swapTiles(t1, t2);
-        setNumMoves(numMoves + 1);
-        if (isPuzzleSolved()) {
-            displayStatus("Solved in " + numMoves + " moves!")
-        }
-    }
 }
 
 function preloadImages(srcs, imgs, callback) {
@@ -163,10 +158,36 @@ function init() {
     displayStatus("Loading Images");
 
     loadTileImages(function() {
+        puzzleModel = new PuzzleModel(2, 2);
         initTileElements();
-        resetPuzzle();
-        displayStatus("Try me!")
+        drawPuzzle();
+        displayStatus("Try me!");
     });
 }
+
+function resetPuzzle() {
+    puzzleModel.reset();
+    drawPuzzle();
+    displayStatus("Try again!");
+}
+
+function drawPuzzle() {
+    var i;
+    for (i = 0; i < puzzleModel.numTiles; i++) {
+        drawTile(i);
+    }
+}
+
+function trySwapTiles(t1, t2) {
+    if (puzzleModel.trySwapTiles(t1, t2)) {
+        drawPuzzle();
+        if (puzzleModel.isSolved()) {
+            displayStatus("Solved in " + puzzleModel.numMoves + " moves!");
+        } else {
+            displayStatus(puzzleModel.numMoves + " moves");
+        }
+    }
+}
+
 </script>
 </html>
