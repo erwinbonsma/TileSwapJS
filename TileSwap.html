@@ -8,9 +8,9 @@
 
 <table border="1">
 <tr>
-<td id="tile0" />
+<td><canvas id="tile0" width="56" height="56"/></td>
 <td><button onclick="trySwapTiles(0, 1)">-</button></td>
-<td id="tile1" />
+<td><canvas id="tile1" width="56" height="56"/></td>
 </tr>
 <tr>
 <td><button onclick="trySwapTiles(0, 2)">|</button></td>
@@ -18,15 +18,17 @@
 <td><button onclick="trySwapTiles(1, 3)">|</button></td>
 </tr>
 <tr>
-<td id="tile2" />
+<td><canvas id="tile2" width="56" height="56"/></td>
 <td><button onclick="trySwapTiles(2, 3)">-</button></td>
-<td id="tile3" />
+<td><canvas id="tile3" width="56" height="56"/></td>
 </tr>
 </table>
 
-<p id="status" />
+<p id="status">...</p>
 
 <button onclick="resetPuzzle()">Reset</button>
+
+<button onclick="init()">Initialize</button>
 
 </body>
 
@@ -34,9 +36,13 @@
 var numCols = 2;
 var numRows = 2;
 var numTiles = numCols * numRows;
+
 var tileElements = [];
 var tiles = [];
+
 var numMoves = 0;
+
+var emptyTileImage, dotImage;
 
 function initTileElements() {
     var i;
@@ -45,9 +51,36 @@ function initTileElements() {
     }
 }
 
+var dotPositions = [
+    [4],
+    [0, 8],
+    [0, 4, 8],
+    [0, 2, 6, 8]
+];
+var dotTileSep = 13;
+var dotMod = 3;
+function drawTile(tileIndex) {
+    console.log("Drawing tile " + tileIndex + " with value " + tiles[tileIndex]);
+    var canvas = tileElements[tileIndex];
+    var ctx = canvas.getContext("2d");
+    ctx.drawImage(emptyTileImage, 0, 0, canvas.width, canvas.height);
+
+    var i;
+	var dotSep = (canvas.width - 2 * dotTileSep) / (dotMod - 1);
+    var dots = dotPositions[tiles[tileIndex] - 1];
+    for (i = 0; i < dots.length; i++) {
+        var dotPos = dots[i];
+		var dotx = dotTileSep + Math.floor(dotPos / dotMod) * dotSep - dotImage.width / 2;
+		var doty = dotTileSep + (dotPos % dotMod) * dotSep - dotImage.height / 2;
+
+        ctx.drawImage(dotImage, dotx, doty);
+        console.log("  Dot at " + dotx + ", " + doty);
+    }
+}
+
 function setTile(tileIndex, value) {
     tiles[tileIndex] = value;
-    tileElements[tileIndex].innerHTML = value;
+    drawTile(tileIndex);
 }
 
 function displayStatus(statusText) {
@@ -98,8 +131,42 @@ function trySwapTiles(t1, t2) {
     }
 }
 
-initTileElements();
-resetPuzzle();
-displayStatus("Try me!");
+function preloadImages(srcs, imgs, callback) {
+    var img;
+    var remaining = srcs.length;
+    for (var i = 0; i < srcs.length; i++) {
+        img = new Image();
+        img.onload = function() {
+            --remaining;
+            if (remaining <= 0) {
+                callback();
+            }
+        };
+        img.src = srcs[i];
+        imgs.push(img);
+    }
+}
+
+function loadTileImages(callback) {
+    var tilePartImageSources = ["Images/Tile.png", "Images/Dot.png"];
+    var tilePartImages = [];
+
+    preloadImages(tilePartImageSources, tilePartImages, function() {
+        emptyTileImage = tilePartImages[0];
+        dotImage = tilePartImages[1];
+
+        callback();
+    });
+}
+
+function init() {
+    displayStatus("Loading Images");
+
+    loadTileImages(function() {
+        initTileElements();
+        resetPuzzle();
+        displayStatus("Try me!")
+    });
+}
 </script>
 </html>
