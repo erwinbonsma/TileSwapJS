@@ -10,7 +10,7 @@
 
 <p id="status">&nbsp;</p>
 
-<button onclick="resetPuzzle()">Reset</button>
+<button onclick="puzzleControl.resetPuzzle()">Reset</button>
 
 <button onclick="init()">Initialize</button>
 
@@ -19,14 +19,23 @@
 <script>
 var puzzleModel;
 var puzzleViewer;
+var puzzleControl;
+
+function SwapPair(pos1, pos2) {
+    this.pos1 = pos1;
+    this.pos2 = pos2;
+}
+
+SwapPair.prototype.toString = function() {
+    return "(" + this.pos1 + ", " + this.pos2 + ")";
+}
 
 function PuzzleModel(numCols, numRows) {
     this.numCols = numCols;
     this.numRows = numRows;
     this.numTiles = numCols * numRows;
-    this.numMoves = 0;
-
     this.tiles = [];
+    this.numMoves = 0;
 
     this.reset();
 }
@@ -57,20 +66,20 @@ PuzzleModel.prototype.tileValueAt = function(tilePos) {
     return this.tiles[tilePos] + 1;
 }
 
-PuzzleModel.prototype.canSwapTiles = function(tilePos1, tilePos2) {
-    var sum = this.tileValueAt(tilePos1) + this.tileValueAt(tilePos2);
+PuzzleModel.prototype.canSwapTiles = function(swapPair) {
+    var sum = this.tileValueAt(swapPair.pos1) + this.tileValueAt(swapPair.pos2);
     return (sum % 3) == 0 || (sum % 5) == 0;
 }
 
-PuzzleModel.prototype.swapTiles = function(tilePos1, tilePos2) {
-    var tile1 = this.tiles[tilePos1];
-    this.tiles[tilePos1] = this.tiles[tilePos2];
-    this.tiles[tilePos2] = tile1;
+PuzzleModel.prototype.swapTiles = function(swapPair) {
+    var tile1 = this.tiles[swapPair.pos1];
+    this.tiles[swapPair.pos1] = this.tiles[swapPair.pos2];
+    this.tiles[swapPair.pos2] = tile1;
 }
 
-PuzzleModel.prototype.trySwapTiles = function(tilePos1, tilePos2) {
-    if (this.canSwapTiles(tilePos1, tilePos2)) {
-        this.swapTiles(tilePos1, tilePos2);
+PuzzleModel.prototype.trySwapTiles = function(swapPair) {
+    if (this.canSwapTiles(swapPair)) {
+        this.swapTiles(swapPair);
         this.numMoves++;
         return true;
     }
@@ -81,8 +90,10 @@ function PuzzleViewer(puzzleModel, emptyTileImage, dotImage) {
     this.model = puzzleModel;
     this.tileElements = [];
     this.tileSprites = [];
+    this.canvas = document.getElementById("puzzleCanvas");
 
     this.initTileSprites(emptyTileImage, dotImage);
+    this.tileSize = emptyTileImage.width;
 
     // Constants
     this.borderTileSep = 30;
@@ -106,15 +117,74 @@ PuzzleViewer.prototype.initTileSprites = function(emptyTileImage, dotImage) {
 }
 
 PuzzleViewer.prototype.drawPuzzle = function() {
-    var canvas = document.getElementById("puzzleCanvas");
+    var ctx = this.canvas.getContext("2d");
     var i;
     for (i = 0; i < this.model.numTiles; i++) {
         var x = this.borderTileSep + (i % this.model.numCols) * this.tileDistance;
         var y = this.borderTileSep + Math.floor(i / this.model.numCols) * this.tileDistance;
 
-        console.log("Draw tile " + this.model.tileAt(i) + " at " + x + ", " + y);
-        this.tileSprites[this.model.tileAt(i)].draw(canvas, x, y);
+        //console.log("Draw tile " + this.model.tileAt(i) + " at " + x + ", " + y);
+        this.tileSprites[this.model.tileAt(i)].draw(ctx, x, y);
     }
+}
+
+PuzzleViewer.prototype.swapPairAt = function(x, y) {
+    var x = x - this.borderTileSep;
+    var y = y - this.borderTileSep;
+
+    var onCol = x % this.tileDistance < this.tileSize;
+    var onRow = y % this.tileDistance < this.tileSize;
+
+    var row = Math.floor(y / this.tileDistance);
+    var col = Math.floor(x / this.tileDistance);
+
+    var tileCols = this.model.numCols;
+    if (onCol && !onRow && col >= 0 && col < tileCols) {
+        // Vertical Swap
+        return new SwapPair(col + row * tileCols, col + (row + 1) * tileCols);
+    }
+    if (!onCol && onRow && row >= 0 && row < this.model.numRows) {
+        // Horizontal Swap
+        return new SwapPair(col + row * tileCols, col + row * tileCols + 1);
+    }
+}
+
+function PuzzleControl(puzzleModel, puzzleViewer) {
+    this.model = puzzleModel;
+    this.viewer = puzzleViewer;
+
+    var me = this;
+    this.viewer.canvas.addEventListener("mousedown", function(evt) { me.handleClick(evt) });
+}
+
+PuzzleControl.prototype.handleClick = function(evt) {
+    var rect = this.viewer.canvas.getBoundingClientRect();
+    var x = evt.clientX - rect.left;
+    var y = evt.clientY - rect.top;
+    console.log("Handle click at " + x + ", " + y);
+
+    var swapPair = this.viewer.swapPairAt(x, y);
+    if (swapPair) {
+        this.trySwapTiles(swapPair);
+    }
+}
+
+PuzzleControl.prototype.trySwapTiles = function(swapPair) {
+    console.log("Try swapping " + swapPair);
+    if (this.model.trySwapTiles(swapPair)) {
+        this.viewer.drawPuzzle();
+        if (this.model.isSolved()) {
+            displayStatus("Solved in " + this.model.numMoves + " moves!");
+        } else {
+            displayStatus(this.model.numMoves + " moves");
+        }
+    }
+}
+
+PuzzleControl.prototype.resetPuzzle = function() {
+    this.model.reset();
+    this.viewer.drawPuzzle();
+    displayStatus("Try again!");
 }
 
 function TileSprite(dots, emptyTileImage, dotImage) {
@@ -127,8 +197,7 @@ function TileSprite(dots, emptyTileImage, dotImage) {
     this.dotMod = 3;
 }
 
-TileSprite.prototype.draw = function(canvas, x, y) {
-    var ctx = canvas.getContext("2d");
+TileSprite.prototype.draw = function(ctx, x, y) {
     ctx.drawImage(this.emptyTileImage, x, y);
 
     var i;
@@ -173,28 +242,12 @@ function init() {
         tileImages,
         function() {
             puzzleViewer = new PuzzleViewer(puzzleModel, tileImages[0], tileImages[1]);
+            puzzleControl = new PuzzleControl(puzzleModel, puzzleViewer);
 
             puzzleViewer.drawPuzzle();
             displayStatus("Try me!");
         }
     );
-}
-
-function resetPuzzle() {
-    puzzleModel.reset();
-    puzzleViewer.drawPuzzle();
-    displayStatus("Try again!");
-}
-
-function trySwapTiles(t1, t2) {
-    if (puzzleModel.trySwapTiles(t1, t2)) {
-        puzzleViewer.drawPuzzle();
-        if (puzzleModel.isSolved()) {
-            displayStatus("Solved in " + puzzleModel.numMoves + " moves!");
-        } else {
-            displayStatus(puzzleModel.numMoves + " moves");
-        }
-    }
 }
 </script>
 </html>
