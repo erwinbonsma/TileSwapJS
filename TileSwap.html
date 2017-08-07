@@ -180,6 +180,11 @@ function PuzzleControl(puzzleModel, puzzleViewer) {
 }
 
 PuzzleControl.prototype.handleClick = function(evt) {
+    if (this.animation) {
+        console.log("Ignoring click while animation is ongoing");
+        return;
+    }
+
     var rect = this.viewer.canvas.getBoundingClientRect();
     var x = evt.clientX - rect.left;
     var y = evt.clientY - rect.top;
