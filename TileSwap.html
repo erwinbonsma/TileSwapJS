@@ -1,18 +1,20 @@
 <html>
 <head>
-<title>Tile Swap</title>
+<title>Dancing Dice &amp; Dominoes</title>
 </head>
 <body>
 
-<h1>Puzzle</h1>
+<h1>Dancing Dice &amp; Dominoes</h1>
 
-<canvas id="puzzleCanvas" width="296" height="296"></canvas>
+<canvas id="puzzleCanvas" width="280" height="280"></canvas>
 
 <p id="status">&nbsp;</p>
 
 <button onclick="puzzleControl.resetPuzzle()">Reset</button>
 
+<!--
 <button onclick="init()">Initialize</button>
+-->
 
 </body>
 
@@ -99,7 +101,7 @@ function PuzzleViewer(puzzleModel, emptyTileImage, dotImage) {
 
     // Constants
     this.borderTileSep = 30;
-    this.tileDistance = 90;
+    this.tileDistance = 82;
 }
 
 PuzzleViewer.prototype.initTileSprites = function(emptyTileImage, dotImage) {
@@ -420,5 +422,7 @@ function init() {
         }
     );
 }
+
+init();
 </script>
 </html>
