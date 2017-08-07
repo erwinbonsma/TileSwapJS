@@ -6,7 +6,7 @@
 
 <h1>Puzzle</h1>
 
-<canvas id="puzzleCanvas" width="200" height="200"></canvas>
+<canvas id="puzzleCanvas" width="206" height="206"></canvas>
 
 <p id="status">&nbsp;</p>
 
@@ -20,6 +20,8 @@
 var puzzleModel;
 var puzzleViewer;
 var puzzleControl;
+
+var TO_RADIANS = Math.PI/180; 
 
 function SwapPair(pos1, pos2) {
     this.pos1 = pos1;
@@ -118,13 +120,28 @@ PuzzleViewer.prototype.initTileSprites = function(emptyTileImage, dotImage) {
 
 PuzzleViewer.prototype.drawPuzzle = function() {
     var ctx = this.canvas.getContext("2d");
+    var x0 = this.borderTileSep + this.tileSize / 2;
+    var y0 = x0;
     var i;
+
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
     for (i = 0; i < this.model.numTiles; i++) {
-        var x = this.borderTileSep + (i % this.model.numCols) * this.tileDistance;
-        var y = this.borderTileSep + Math.floor(i / this.model.numCols) * this.tileDistance;
+        var x = x0 + (i % this.model.numCols) * this.tileDistance;
+        var y = y0 + Math.floor(i / this.model.numCols) * this.tileDistance;
 
         //console.log("Draw tile " + this.model.tileAt(i) + " at " + x + ", " + y);
-        this.tileSprites[this.model.tileAt(i)].draw(ctx, x, y);
+        var sprite = this.tileSprites[this.model.tileAt(i)];
+        if ( !sprite.isPivotting ) {
+            sprite.x = x;
+            sprite.y = y;
+            sprite.draw(ctx);
+        }
+    }
+
+    if (this.pivot) {
+        this.pivot.draw(ctx);
     }
 }
 
@@ -172,12 +189,25 @@ PuzzleControl.prototype.handleClick = function(evt) {
 PuzzleControl.prototype.trySwapTiles = function(swapPair) {
     console.log("Try swapping " + swapPair);
     if (this.model.trySwapTiles(swapPair)) {
-        this.viewer.drawPuzzle();
-        if (this.model.isSolved()) {
-            displayStatus("Solved in " + this.model.numMoves + " moves!");
-        } else {
-            displayStatus(this.model.numMoves + " moves");
-        }
+        this.animation = new SwapAnimation(
+            this.viewer.tileSprites[this.model.tileAt(swapPair.pos1)],
+            this.viewer.tileSprites[this.model.tileAt(swapPair.pos2)],
+            this.viewer.tileSize
+        );
+        var me = this;
+        this.animation.go(function() { me.swapDone(); });
+    }
+}
+
+PuzzleControl.prototype.swapDone = function() {
+    // Update tile positions now that they stopped pivotting
+    this.viewer.drawPuzzle();
+
+    this.animation = null;
+    if (this.model.isSolved()) {
+        displayStatus("Solved in " + this.model.numMoves + " moves!");
+    } else {
+        displayStatus(this.model.numMoves + " moves");
     }
 }
 
@@ -187,7 +217,27 @@ PuzzleControl.prototype.resetPuzzle = function() {
     displayStatus("Try again!");
 }
 
+function Sprite() {
+    this.x = 0;
+    this.y = 0;
+    this.rotation = 0;
+}
+
+// Draws the sprite, taking into account position and rotation
+Sprite.prototype.draw = function(ctx) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation * TO_RADIANS);
+
+    // Draw the sprite placed at the origin in normal orientation
+    this.basicDraw(ctx);
+
+    ctx.restore();
+}
+
 function TileSprite(dots, emptyTileImage, dotImage) {
+    Sprite.call(this);
+
     this.dots = dots;
     this.emptyTileImage = emptyTileImage;
     this.dotImage = dotImage;
@@ -196,9 +246,12 @@ function TileSprite(dots, emptyTileImage, dotImage) {
     this.dotTileSep = 13;
     this.dotMod = 3;
 }
+TileSprite.prototype = Object.create(Sprite.prototype);
 
-TileSprite.prototype.draw = function(ctx, x, y) {
-    ctx.drawImage(this.emptyTileImage, x, y);
+TileSprite.prototype.basicDraw = function(ctx) {
+    var x0 = -this.emptyTileImage.width / 2;
+    var y0 = -this.emptyTileImage.height / 2;
+    ctx.drawImage(this.emptyTileImage, x0, y0);
 
     var i;
 	var dotSep = (this.emptyTileImage.width - 2 * this.dotTileSep) / (this.dotMod - 1);
@@ -208,8 +261,116 @@ TileSprite.prototype.draw = function(ctx, x, y) {
 		var dotx = this.dotTileSep + Math.floor(dot / this.dotMod) * dotSep - dotSize / 2;
 		var doty = this.dotTileSep + (dot % this.dotMod) * dotSep - dotSize / 2;
 
-        ctx.drawImage(this.dotImage, x + dotx, y + doty);
+        ctx.drawImage(this.dotImage, x0 + dotx, y0 + doty);
     }
+}
+
+function Pivot(tileSprite1, tileSprite2) {
+    Sprite.call(this);
+
+    this.sprites = [];
+}
+Pivot.prototype = Object.create(Sprite.prototype);
+
+Pivot.prototype.basicDraw = function(ctx) {
+    var i;
+    for (i = 0; i < this.sprites.length; i++) {
+        this.sprites[i].draw(ctx);
+    }
+}
+
+Pivot.prototype.addSprite = function(sprite) {
+    sprite.isPivotting = true;
+
+    this.sprites.push(sprite);
+    sprite.x -= this.x;
+    sprite.y -= this.y;
+}
+
+Pivot.prototype.destroy = function() {
+    var i;
+    for (i = 0; i < this.sprites.length; i++) {
+        this.sprites[i].isPivotting = false;
+    }
+    this.sprites = null;
+}
+
+function SwapAnimation(tileSprite1, tileSprite2, tileSize) {
+    var pivot = new Pivot();
+    pivot.x = (tileSprite1.x + tileSprite2.x) / 2;
+    pivot.y = (tileSprite1.y + tileSprite2.y) / 2;
+    pivot.addSprite(tileSprite1);
+    pivot.addSprite(tileSprite2);
+
+    puzzleViewer.pivot = pivot;
+
+    this.moveDeltaX = this.moveDelta(tileSprite1.x, tileSprite2.x, tileSize);
+    this.moveDeltaY = this.moveDelta(tileSprite1.y, tileSprite2.y, tileSize);
+
+    this.phaseSteps = 0;
+}
+
+// The amount that each tile should move
+SwapAnimation.prototype.moveDelta = function(coord1, coord2, tileSize) {
+    var delta = coord2 - coord1;
+    if (delta > tileSize) {
+        return (delta - tileSize) / 2;
+    }
+    if (-delta > tileSize) {
+        return (delta + tileSize) / 2;
+    }
+    return 0;
+}
+
+SwapAnimation.prototype.go = function(callback) {
+    this.callback = callback;
+    var me = this;
+    this.id = setInterval(function() { me.step() }, 5);
+}
+
+SwapAnimation.prototype.step = function() {
+    if ( !this.tilesConnected ) {
+        if (this.moveTilesStep(1)) {
+            this.tilesConnected = true;
+            this.phaseSteps = 0;
+        }
+    } else if ( !this.tilesSwapped ) {
+        if (this.swapTilesStep()) {
+            this.tilesSwapped = true;
+            this.phaseSteps = 0;
+        }
+    } else {
+        if (this.moveTilesStep(-1)) {
+            clearInterval(this.id);
+            puzzleViewer.pivot.destroy();
+            puzzleViewer.pivot = null;
+            this.callback();
+        }
+    }
+    puzzleViewer.drawPuzzle();
+}
+
+SwapAnimation.prototype.moveTilesStep = function(direction) {
+    var phaseStepsTotal = 30;
+    var pivot = puzzleViewer.pivot;
+
+    this.phaseSteps++;
+    pivot.sprites[0].x += direction * this.moveDeltaX / phaseStepsTotal;
+    pivot.sprites[1].x -= direction * this.moveDeltaX / phaseStepsTotal;
+    pivot.sprites[0].y += direction * this.moveDeltaY / phaseStepsTotal;
+    pivot.sprites[1].y -= direction * this.moveDeltaY / phaseStepsTotal;
+
+    return this.phaseSteps == phaseStepsTotal;
+}
+
+SwapAnimation.prototype.swapTilesStep = function() {
+    var phaseStepsTotal = 100;
+    var pivot = puzzleViewer.pivot;
+
+    this.phaseSteps++;
+    pivot.rotation = 180 * this.phaseSteps / phaseStepsTotal;
+
+    return this.phaseSteps == phaseStepsTotal;
 }
 
 function displayStatus(statusText) {
