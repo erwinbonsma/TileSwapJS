@@ -6,7 +6,7 @@
 
 <h1>Puzzle</h1>
 
-<canvas id="puzzleCanvas" width="206" height="206"></canvas>
+<canvas id="puzzleCanvas" width="296" height="296"></canvas>
 
 <p id="status">&nbsp;</p>
 
@@ -21,7 +21,7 @@ var puzzleModel;
 var puzzleViewer;
 var puzzleControl;
 
-var TO_RADIANS = Math.PI/180; 
+var TO_RADIANS = Math.PI/180;
 
 function SwapPair(pos1, pos2) {
     this.pos1 = pos1;
@@ -107,7 +107,12 @@ PuzzleViewer.prototype.initTileSprites = function(emptyTileImage, dotImage) {
         [4],
         [0, 8],
         [0, 4, 8],
-        [0, 2, 6, 8]
+        [0, 2, 6, 8],
+        [0, 2, 4, 6, 8],
+        [0, 2, 3, 5, 6, 8],
+        [0, 2, 3, 4, 5, 6, 8],
+        [0, 1, 2, 3, 5, 6, 7, 8],
+        [0, 1, 2, 3, 4, 5, 6, 7, 8]
     ];
 
     var i;
@@ -258,8 +263,8 @@ TileSprite.prototype.basicDraw = function(ctx) {
     var dotSize = this.dotImage.width;
     for (i = 0; i < this.dots.length; i++) {
         var dot = this.dots[i];
-		var dotx = this.dotTileSep + Math.floor(dot / this.dotMod) * dotSep - dotSize / 2;
-		var doty = this.dotTileSep + (dot % this.dotMod) * dotSep - dotSize / 2;
+		var dotx = this.dotTileSep + (dot % this.dotMod) * dotSep - dotSize / 2;
+		var doty = this.dotTileSep + Math.floor(dot / this.dotMod) * dotSep - dotSize / 2;
 
         ctx.drawImage(this.dotImage, x0 + dotx, y0 + doty);
     }
@@ -394,7 +399,7 @@ function preloadImages(srcs, imgs, callback) {
 }
 
 function init() {
-    puzzleModel = new PuzzleModel(2, 2);
+    puzzleModel = new PuzzleModel(3, 3);
 
     displayStatus("Loading Images");
     var tileImages = [];
