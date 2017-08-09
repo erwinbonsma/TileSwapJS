@@ -11,6 +11,7 @@
 <p id="status">&nbsp;</p>
 
 <button onclick="puzzleControl.resetPuzzle()">Reset</button>
+<button onclick="puzzleControl.undoMove()">Undo</button>
 
 <!--
 <button onclick="init()">Initialize</button>
@@ -26,12 +27,61 @@ var puzzleControl;
 var TO_RADIANS = Math.PI/180;
 
 function SwapPair(pos1, pos2) {
-    this.pos1 = pos1;
-    this.pos2 = pos2;
+    this.pos1 = Math.min(pos1, pos2);
+    this.pos2 = Math.max(pos1, pos2);
 }
 
 SwapPair.prototype.toString = function() {
     return "(" + this.pos1 + ", " + this.pos2 + ")";
+}
+
+function MoveSequence(puzzleModel) {
+    this.model = puzzleModel;
+    this.sequence = "";
+}
+
+MoveSequence.prototype.numMoves = function() {
+    return this.sequence.length;
+}
+
+MoveSequence.prototype.addMove = function(swapPair) {
+    var moveValue = swapPair.pos1; // 0 <= val <= numTiles - 2
+    if (swapPair.pos2 > swapPair.pos1 + 1) {
+        moveValue += (this.model.numTiles - 1);
+    }
+    console.log("moveValue = " + moveValue);
+    var moveChar = String.fromCharCode(65 + moveValue);
+    console.log("move = " + moveChar);
+    // TODO: Replace with sequence.endsWith(moveChar) once that is widely supported.
+    if (this.sequence.length > 0 && this.sequence.charAt(this.sequence.length - 1) == moveChar) {
+        // Move is an undo of the last move
+        this.sequence = this.sequence.substr(0, this.sequence.length - 1);
+    } else {
+        this.sequence = this.sequence + moveChar;
+    }
+    console.log("sequence = " + this.sequence);
+}
+
+MoveSequence.prototype.moveAt = function(moveIndex) {
+    var moveValue = this.sequence.charCodeAt(moveIndex) - 65;
+    var posDelta;
+    if (moveValue >= this.model.numTiles - 1) {
+        posDelta = this.model.numCols;
+        moveValue -= this.model.numTiles - 1;
+    } else {
+        posDelta = 1;
+    }
+    return new SwapPair(moveValue, moveValue + posDelta);
+}
+
+MoveSequence.prototype.lastMove = function() {
+    if (this.sequence.length > 0) {
+        return this.moveAt(this.sequence.length - 1);
+    }
+}
+
+MoveSequence.prototype.reset = function() {
+    this.sequence = "";
 }
 
 function PuzzleModel(numCols, numRows) {
@@ -39,7 +89,7 @@ function PuzzleModel(numCols, numRows) {
     this.numRows = numRows;
     this.numTiles = numCols * numRows;
     this.tiles = [];
-    this.numMoves = 0;
+    this.moves = new MoveSequence(this);
 
     this.reset();
 }
@@ -49,7 +99,7 @@ PuzzleModel.prototype.reset = function() {
     for (i = 0; i < this.numTiles; i++) {
         this.tiles[i] = this.numTiles - i - 1;
     }
-    this.numMoves = 0;
+    this.moves.reset();
 }
 
 PuzzleModel.prototype.isSolved = function() {
@@ -84,7 +134,7 @@ PuzzleModel.prototype.swapTiles = function(swapPair) {
 PuzzleModel.prototype.trySwapTiles = function(swapPair) {
     if (this.canSwapTiles(swapPair)) {
         this.swapTiles(swapPair);
-        this.numMoves++;
+        this.moves.addMove(swapPair);
         return true;
     }
     return false;
@@ -240,9 +290,9 @@ PuzzleControl.prototype.swapDone = function() {
 
     this.animation = null;
     if (this.model.isSolved()) {
-        displayStatus("Solved in " + this.model.numMoves + " moves!");
+        displayStatus("Solved in " + this.model.moves.numMoves() + " moves!");
     } else {
-        displayStatus(this.model.numMoves + " moves");
+        displayStatus(this.model.moves.numMoves() + " moves");
     }
 }
 
@@ -250,6 +300,19 @@ PuzzleControl.prototype.resetPuzzle = function() {
     this.model.reset();
     this.viewer.drawPuzzle();
     displayStatus("Try again!");
+}
+
+PuzzleControl.prototype.undoMove = function() {
+    if (this.animation) {
+        console.log("Ignoring undo while animation is ongoing");
+        return;
+    }
+
+    var swapPair = this.model.moves.lastMove();
+    if (swapPair) {
+        console.log("Undoing " + swapPair);
+        this.trySwapTiles(swapPair);
+    }
 }
 
 function Sprite() {
