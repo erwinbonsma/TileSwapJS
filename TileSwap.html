@@ -12,6 +12,10 @@
 
 <button onclick="puzzleControl.resetPuzzle()">Reset</button>
 <button onclick="puzzleControl.undoMove()">Undo</button>
+<button onclick="puzzleControl.replayMoves()">Replay</button>
+
+<br>
+<input type="text" id="moves" value="">
 
 <!--
 <button onclick="init()">Initialize</button>
@@ -271,7 +275,7 @@ PuzzleControl.prototype.handleClick = function(evt) {
     }
 }
 
-PuzzleControl.prototype.trySwapTiles = function(swapPair) {
+PuzzleControl.prototype.trySwapTiles = function(swapPair, callback) {
     console.log("Try swapping " + swapPair);
     if (this.model.trySwapTiles(swapPair)) {
         this.animation = new SwapAnimation(
@@ -279,16 +283,18 @@ PuzzleControl.prototype.trySwapTiles = function(swapPair) {
             this.viewer.tileSprites[this.model.tileAt(swapPair.pos2)],
             this.viewer.tileSize
         );
-        var me = this;
-        this.animation.go(function() { me.swapDone(); });
+        if (!callback) {
+            var me = this;
+            callback = function() { me.swapDone(); };
+        }
+        this.animation.go(callback);
     }
 }
 
 PuzzleControl.prototype.swapDone = function() {
-    // Update tile positions now that they stopped pivotting
-    this.viewer.drawPuzzle();
-
     this.animation = null;
+
+    document.getElementById("moves").value = this.model.moves.sequence;
     if (this.model.isSolved()) {
         displayStatus("Solved in " + this.model.moves.numMoves() + " moves!");
     } else {
@@ -297,16 +303,15 @@ PuzzleControl.prototype.swapDone = function() {
 }
 
 PuzzleControl.prototype.resetPuzzle = function() {
+    if (this.animation) return;
+
     this.model.reset();
     this.viewer.drawPuzzle();
     displayStatus("Try again!");
 }
 
 PuzzleControl.prototype.undoMove = function() {
-    if (this.animation) {
-        console.log("Ignoring undo while animation is ongoing");
-        return;
-    }
+    if (this.animation) return;
 
     var swapPair = this.model.moves.lastMove();
     if (swapPair) {
@@ -314,6 +319,41 @@ PuzzleControl.prototype.undoMove = function() {
         this.trySwapTiles(swapPair);
     }
 }
+
+PuzzleControl.prototype.replayMoves = function() {
+    if (this.animation) return;
+
+    this.resetPuzzle();
+
+    // Take from input field, so that user can inject sequence
+    var moves = new MoveSequence(this.model);
+    moves.sequence = document.getElementById("moves").value;
+
+    var movesReplay = new MovesReplay(moves, this);
+    movesReplay.replayNextMove();
+}
+
+function MovesReplay(moves, puzzleControl) {
+    this.moves = moves;
+    this.control = puzzleControl;
+}
+
+MovesReplay.prototype.replayNextMove = function() {
+    var movesSofar = this.control.model.moves.numMoves();
+    if (movesSofar == this.moves.numMoves()) {
+        // All done
+        this.control.swapDone();
+    } else {
+        displayStatus("Replaying move " + (movesSofar + 1));
+        var me = this;
+        // Replay next move
+        this.control.trySwapTiles(
+            this.moves.moveAt(movesSofar),
+            function() { me.replayNextMove() }
+        );
+    }
+}
+
 
 function Sprite() {
     this.x = 0;
@@ -439,13 +479,20 @@ SwapAnimation.prototype.step = function() {
         }
     } else {
         if (this.moveTilesStep(-1)) {
-            clearInterval(this.id);
+            this.animationDone = true;
             puzzleViewer.pivot.destroy();
             puzzleViewer.pivot = null;
-            this.callback();
         }
     }
+
     puzzleViewer.drawPuzzle();
+
+    if (this.animationDone) {
+        clearInterval(this.id);
+        // Invoke after drawPuzzle with pivot cleared. This ensures that both swapped tile
+        // positions are updated
+        this.callback();
+    }
 }
 
 SwapAnimation.prototype.moveTilesStep = function(direction) {
