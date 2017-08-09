@@ -102,6 +102,8 @@ function PuzzleViewer(puzzleModel, emptyTileImage, dotImage) {
     // Constants
     this.borderTileSep = 30;
     this.tileDistance = 82;
+    this.borderFrameSep = 10;
+    this.frameCornerR = 30;
 }
 
 PuzzleViewer.prototype.initTileSprites = function(emptyTileImage, dotImage) {
@@ -125,6 +127,25 @@ PuzzleViewer.prototype.initTileSprites = function(emptyTileImage, dotImage) {
     }
 }
 
+PuzzleViewer.prototype.drawFrame = function(ctx) {
+    var r = this.frameCornerR;
+    var x0 = this.borderFrameSep;
+    var y0 = x0;
+    var w = this.tileSize + (this.model.numCols - 1) * this.tileDistance +
+        2 * (this.borderTileSep - this.borderFrameSep);
+    var h = this.tileSize + (this.model.numRows - 1) * this.tileDistance +
+        2 * (this.borderTileSep - this.borderFrameSep);
+
+    ctx.fillStyle = "#000000";
+    ctx.beginPath();
+    ctx.arc(x0 + r,     y0 + r,     r, Math.PI, 1.5 * Math.PI, false);
+    ctx.arc(x0 + w - r, y0 + r,     r, 1.5 * Math.PI, 2 * Math.PI, false);
+    ctx.arc(x0 + w - r, y0 + h - r, r, 0, 0.5 * Math.PI, false);
+    ctx.arc(x0 + r,     y0 + h - r, r, 0.5 * Math.PI, Math.PI, false);
+    ctx.closePath();
+    ctx.fill();
+}
+
 PuzzleViewer.prototype.drawPuzzle = function() {
     var ctx = this.canvas.getContext("2d");
     var x0 = this.borderTileSep + this.tileSize / 2;
@@ -133,6 +154,8 @@ PuzzleViewer.prototype.drawPuzzle = function() {
 
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    this.drawFrame(ctx);
 
     for (i = 0; i < this.model.numTiles; i++) {
         var x = x0 + (i % this.model.numCols) * this.tileDistance;
