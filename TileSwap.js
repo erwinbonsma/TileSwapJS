@@ -133,14 +133,36 @@ function PuzzleViewer(puzzleModel) {
     this.tileSprites = [];
     this.canvas = document.getElementById("puzzleCanvas");
 
-    // Constants
-    this.tileSize = 56;
-    this.borderTileSep = 30;
-    this.tileDistance = 82;
-    this.borderFrameSep = 10;
-    this.frameCornerR = 30;
-
+    this.updateSizes(this.canvas.width);
     this.initTileSprites();
+}
+
+// Set sizes of the various puzzle elements based on the size of the view
+PuzzleViewer.prototype.updateSizes = function(viewWidth) {
+    var cols = this.model.numCols;
+    var rows = this.model.numRows;
+
+    // Relative sizes (wrt to tile size)
+    var tileSepRel = 0.46; // Distance between tiles
+    var tileBorderSepRel = 0.54; // Distance between tile and canvas
+    var tileFrameSepRel = 0.35; // Distance between tile and frame
+    var dotTileSepRel = 0.23; // Distance between center of dot and tile border
+
+    this.tileSize = viewWidth / (cols + (cols - 1) * tileSepRel + 2 * tileBorderSepRel);
+    console.log("tileSize = " + this.tileSize);
+
+    this.tileDistance = this.tileSize * (1 + tileSepRel);
+    this.tilePos0 = this.tileSize * (0.5 + tileBorderSepRel);
+    this.tileR = this.tileSize * 0.25;
+
+    this.dotR = this.tileSize * 0.09;
+    this.dotPos0 = this.tileSize * dotTileSepRel;
+    this.dotDistance = this.tileSize * (1 - 2 * dotTileSepRel) / 2;
+
+    this.framePos0 = this.tileSize * (tileBorderSepRel - tileFrameSepRel);
+    this.frameW = this.tileSize * (1 + 2 * tileFrameSepRel) + (cols - 1) * this.tileDistance;
+    this.frameH = this.tileSize * (1 + 2 * tileFrameSepRel) + (rows - 1) * this.tileDistance;
+    this.frameR = this.tileSize * 0.50;
 }
 
 PuzzleViewer.prototype.initTileSprites = function() {
@@ -159,46 +181,39 @@ PuzzleViewer.prototype.initTileSprites = function() {
     var i;
     for (i = 0; i < this.model.numTiles; i++) {
         this.tileSprites[i] = new TileSprite(
-            dotsForTiles[i], this.tileSize
+            dotsForTiles[i], this
         );
     }
 }
 
 PuzzleViewer.prototype.drawFrame = function(ctx) {
-    var r = this.frameCornerR;
-    var x0 = this.borderFrameSep;
-    var y0 = x0;
-    var w = this.tileSize + (this.model.numCols - 1) * this.tileDistance +
-        2 * (this.borderTileSep - this.borderFrameSep);
-    var h = this.tileSize + (this.model.numRows - 1) * this.tileDistance +
-        2 * (this.borderTileSep - this.borderFrameSep);
-
     ctx.fillStyle = "#000000";
     ctx.strokeStyle = "#808080";
-    drawRoundedBox(ctx, x0, y0, w, h, this.frameCornerR);
+    drawRoundedBox(
+        ctx, this.framePos0, this.framePos0, this.frameW, this.frameH, this.frameR
+    );
+}
+
+PuzzleViewer.prototype.drawTile = function(ctx, sprite, tileIndex) {
+    sprite.x = this.tilePos0 + (tileIndex % this.model.numCols) * this.tileDistance;
+    sprite.y = this.tilePos0 + Math.floor(tileIndex / this.model.numCols) * this.tileDistance;
+    sprite.draw(ctx);
 }
 
 PuzzleViewer.prototype.drawPuzzle = function() {
     var ctx = this.canvas.getContext("2d");
-    var x0 = this.borderTileSep + this.tileSize / 2;
-    var y0 = x0;
     var i;
 
+    // Clear canvas
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
     this.drawFrame(ctx);
 
     for (i = 0; i < this.model.numTiles; i++) {
-        var x = x0 + (i % this.model.numCols) * this.tileDistance;
-        var y = y0 + Math.floor(i / this.model.numCols) * this.tileDistance;
-
-        //console.log("Draw tile " + this.model.tileAt(i) + " at " + x + ", " + y);
         var sprite = this.tileSprites[this.model.tileAt(i)];
         if ( !sprite.isPivotting ) {
-            sprite.x = x;
-            sprite.y = y;
-            sprite.draw(ctx);
+            this.drawTile(ctx, sprite, i);
         }
     }
 
@@ -208,8 +223,8 @@ PuzzleViewer.prototype.drawPuzzle = function() {
 }
 
 PuzzleViewer.prototype.swapPairAt = function(x, y) {
-    var x = x - this.borderTileSep;
-    var y = y - this.borderTileSep;
+    var x = x - this.tilePos0 + this.tileSize / 2;
+    var y = y - this.tilePos0 + this.tileSize / 2;
 
     var onCol = x % this.tileDistance < this.tileSize;
     var onRow = y % this.tileDistance < this.tileSize;
@@ -329,7 +344,6 @@ MovesReplay.prototype.replayNextMove = function() {
     }
 }
 
-
 function Sprite() {
     this.x = 0;
     this.y = 0;
@@ -348,38 +362,34 @@ Sprite.prototype.draw = function(ctx) {
     ctx.restore();
 }
 
-function TileSprite(dots, tileSize) {
+function TileSprite(dots, puzzleViewer) {
     Sprite.call(this);
 
     this.dots = dots;
-
-    // Constants
-    this.dotTileSep = 13;
+    this.viewer = puzzleViewer;
     this.dotMod = 3;
-    this.tileSize = tileSize;
-    this.tileR = 12;
-    this.dotR = 5;
 }
 TileSprite.prototype = Object.create(Sprite.prototype);
 
 TileSprite.prototype.basicDraw = function(ctx) {
-    var x0 = -this.tileSize / 2;
-    var y0 = -this.tileSize / 2;
+    var tileSize = this.viewer.tileSize;
+    var pos0 = -tileSize / 2;
 
     ctx.fillStyle = "#FF0000";
     ctx.strokeStyle = "#800000";
-    drawRoundedBox(ctx, x0, y0, this.tileSize, this.tileSize, this.tileR);
+    drawRoundedBox(ctx, pos0, pos0, tileSize, tileSize, this.viewer.tileR);
 
     var i;
-	var dotSep = (this.tileSize - 2 * this.dotTileSep) / (this.dotMod - 1);
+    var dotPos0 = pos0 + this.viewer.dotPos0;
+    var dotDist = this.viewer.dotDistance;
     ctx.fillStyle = "#FFFFFF";
     for (i = 0; i < this.dots.length; i++) {
         var dot = this.dots[i];
-		var dotx = this.dotTileSep + (dot % this.dotMod) * dotSep;
-		var doty = this.dotTileSep + Math.floor(dot / this.dotMod) * dotSep;
+		var dotx = dotPos0 + (dot % this.dotMod) * dotDist;
+		var doty = dotPos0 + Math.floor(dot / this.dotMod) * dotDist;
 
         ctx.beginPath();
-        ctx.arc(x0 + dotx, y0 + doty, this.dotR, 0, 2 * Math.PI);
+        ctx.arc(dotx, doty, this.viewer.dotR, 0, 2 * Math.PI);
         ctx.closePath();
         ctx.fill();
     }
