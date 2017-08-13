@@ -4,6 +4,17 @@ var puzzleControl;
 
 var TO_RADIANS = Math.PI/180;
 
+function drawRoundedBox(ctx, x0, y0, w, h, r) {
+    ctx.beginPath();
+    ctx.arc(x0 + r,     y0 + r,     r, Math.PI, 1.5 * Math.PI, false);
+    ctx.arc(x0 + w - r, y0 + r,     r, 1.5 * Math.PI, 2 * Math.PI, false);
+    ctx.arc(x0 + w - r, y0 + h - r, r, 0, 0.5 * Math.PI, false);
+    ctx.arc(x0 + r,     y0 + h - r, r, 0.5 * Math.PI, Math.PI, false);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+}
+
 function SwapPair(pos1, pos2) {
     this.pos1 = Math.min(pos1, pos2);
     this.pos2 = Math.max(pos1, pos2);
@@ -116,23 +127,23 @@ PuzzleModel.prototype.trySwapTiles = function(swapPair) {
     return false;
 }
 
-function PuzzleViewer(puzzleModel, emptyTileImage, dotImage) {
+function PuzzleViewer(puzzleModel) {
     this.model = puzzleModel;
     this.tileElements = [];
     this.tileSprites = [];
     this.canvas = document.getElementById("puzzleCanvas");
 
-    this.initTileSprites(emptyTileImage, dotImage);
-    this.tileSize = emptyTileImage.width;
-
     // Constants
+    this.tileSize = 56;
     this.borderTileSep = 30;
     this.tileDistance = 82;
     this.borderFrameSep = 10;
     this.frameCornerR = 30;
+
+    this.initTileSprites();
 }
 
-PuzzleViewer.prototype.initTileSprites = function(emptyTileImage, dotImage) {
+PuzzleViewer.prototype.initTileSprites = function() {
     var dotsForTiles = [
         [4],
         [0, 8],
@@ -148,7 +159,7 @@ PuzzleViewer.prototype.initTileSprites = function(emptyTileImage, dotImage) {
     var i;
     for (i = 0; i < this.model.numTiles; i++) {
         this.tileSprites[i] = new TileSprite(
-            dotsForTiles[i], emptyTileImage, dotImage
+            dotsForTiles[i], this.tileSize
         );
     }
 }
@@ -163,13 +174,8 @@ PuzzleViewer.prototype.drawFrame = function(ctx) {
         2 * (this.borderTileSep - this.borderFrameSep);
 
     ctx.fillStyle = "#000000";
-    ctx.beginPath();
-    ctx.arc(x0 + r,     y0 + r,     r, Math.PI, 1.5 * Math.PI, false);
-    ctx.arc(x0 + w - r, y0 + r,     r, 1.5 * Math.PI, 2 * Math.PI, false);
-    ctx.arc(x0 + w - r, y0 + h - r, r, 0, 0.5 * Math.PI, false);
-    ctx.arc(x0 + r,     y0 + h - r, r, 0.5 * Math.PI, Math.PI, false);
-    ctx.closePath();
-    ctx.fill();
+    ctx.strokeStyle = "#808080";
+    drawRoundedBox(ctx, x0, y0, w, h, this.frameCornerR);
 }
 
 PuzzleViewer.prototype.drawPuzzle = function() {
@@ -342,33 +348,40 @@ Sprite.prototype.draw = function(ctx) {
     ctx.restore();
 }
 
-function TileSprite(dots, emptyTileImage, dotImage) {
+function TileSprite(dots, tileSize) {
     Sprite.call(this);
 
     this.dots = dots;
-    this.emptyTileImage = emptyTileImage;
-    this.dotImage = dotImage;
 
     // Constants
     this.dotTileSep = 13;
     this.dotMod = 3;
+    this.tileSize = tileSize;
+    this.tileR = 12;
+    this.dotR = 5;
 }
 TileSprite.prototype = Object.create(Sprite.prototype);
 
 TileSprite.prototype.basicDraw = function(ctx) {
-    var x0 = -this.emptyTileImage.width / 2;
-    var y0 = -this.emptyTileImage.height / 2;
-    ctx.drawImage(this.emptyTileImage, x0, y0);
+    var x0 = -this.tileSize / 2;
+    var y0 = -this.tileSize / 2;
+
+    ctx.fillStyle = "#FF0000";
+    ctx.strokeStyle = "#800000";
+    drawRoundedBox(ctx, x0, y0, this.tileSize, this.tileSize, this.tileR);
 
     var i;
-	var dotSep = (this.emptyTileImage.width - 2 * this.dotTileSep) / (this.dotMod - 1);
-    var dotSize = this.dotImage.width;
+	var dotSep = (this.tileSize - 2 * this.dotTileSep) / (this.dotMod - 1);
+    ctx.fillStyle = "#FFFFFF";
     for (i = 0; i < this.dots.length; i++) {
         var dot = this.dots[i];
-		var dotx = this.dotTileSep + (dot % this.dotMod) * dotSep - dotSize / 2;
-		var doty = this.dotTileSep + Math.floor(dot / this.dotMod) * dotSep - dotSize / 2;
+		var dotx = this.dotTileSep + (dot % this.dotMod) * dotSep;
+		var doty = this.dotTileSep + Math.floor(dot / this.dotMod) * dotSep;
 
-        ctx.drawImage(this.dotImage, x0 + dotx, y0 + doty);
+        ctx.beginPath();
+        ctx.arc(x0 + dotx, y0 + doty, this.dotR, 0, 2 * Math.PI);
+        ctx.closePath();
+        ctx.fill();
     }
 }
 
@@ -491,38 +504,12 @@ function displayStatus(statusText) {
     document.getElementById("status").innerHTML = statusText;
 }
 
-function preloadImages(srcs, imgs, callback) {
-    var img;
-    var remaining = srcs.length;
-    for (var i = 0; i < srcs.length; i++) {
-        img = new Image();
-        img.onload = function() {
-            --remaining;
-            if (remaining <= 0) {
-                callback();
-            }
-        };
-        img.src = srcs[i];
-        imgs.push(img);
-    }
-}
-
 function init() {
     puzzleModel = new PuzzleModel(3, 3);
-
-    displayStatus("Loading Images");
-    var tileImages = [];
-    preloadImages(
-        ["Images/Tile.png", "Images/Dot.png"],
-        tileImages,
-        function() {
-            puzzleViewer = new PuzzleViewer(puzzleModel, tileImages[0], tileImages[1]);
-            puzzleControl = new PuzzleControl(puzzleModel, puzzleViewer);
-
-            puzzleViewer.drawPuzzle();
-            displayStatus("Try me!");
-        }
-    );
+    puzzleViewer = new PuzzleViewer(puzzleModel);
+    puzzleControl = new PuzzleControl(puzzleModel, puzzleViewer);
+    puzzleViewer.drawPuzzle();
+    displayStatus("Try me!");
 }
 
 init();
