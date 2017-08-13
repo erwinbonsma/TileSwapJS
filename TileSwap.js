@@ -271,7 +271,7 @@ PuzzleControl.prototype.trySwapTiles = function(swapPair, callback) {
         this.animation = new SwapAnimation(
             this.viewer.tileSprites[this.model.tileAt(swapPair.pos1)],
             this.viewer.tileSprites[this.model.tileAt(swapPair.pos2)],
-            this.viewer.tileSize
+            this.viewer
         );
         if (!callback) {
             var me = this;
@@ -285,11 +285,21 @@ PuzzleControl.prototype.swapDone = function() {
     this.animation = null;
 
     document.getElementById("moves").value = this.model.moves.sequence;
-    if (this.model.isSolved()) {
-        displayStatus("Solved in " + this.model.moves.numMoves() + " moves!");
+    if (this.model.isSolved() || this.model.moves.numMoves() > 2) {
+        displayStatus("Hurray!");
+        var me = this;
+        var callback = function() { me.solveAnimationDone(); };
+        this.animation = new SolveAnimation(this.viewer);
+        this.animation.go(callback);
     } else {
         displayStatus(this.model.moves.numMoves() + " moves");
     }
+}
+
+PuzzleControl.prototype.solveAnimationDone = function() {
+    this.animation = null;
+
+    displayStatus("Solved in " + this.model.moves.numMoves() + " moves!");
 }
 
 PuzzleControl.prototype.resetPuzzle = function() {
@@ -425,17 +435,18 @@ Pivot.prototype.destroy = function() {
     this.sprites = null;
 }
 
-function SwapAnimation(tileSprite1, tileSprite2, tileSize) {
+function SwapAnimation(tileSprite1, tileSprite2, viewer) {
+    this.viewer = viewer;
+
     var pivot = new Pivot();
     pivot.x = (tileSprite1.x + tileSprite2.x) / 2;
     pivot.y = (tileSprite1.y + tileSprite2.y) / 2;
     pivot.addSprite(tileSprite1);
     pivot.addSprite(tileSprite2);
 
-    puzzleViewer.pivot = pivot;
-
-    this.moveDeltaX = this.moveDelta(tileSprite1.x, tileSprite2.x, tileSize);
-    this.moveDeltaY = this.moveDelta(tileSprite1.y, tileSprite2.y, tileSize);
+    this.viewer.pivot = pivot;
+    this.moveDeltaX = this.moveDelta(tileSprite1.x, tileSprite2.x, this.viewer.tileSize);
+    this.moveDeltaY = this.moveDelta(tileSprite1.y, tileSprite2.y, this.viewer.tileSize);
 
     this.phaseSteps = 0;
 }
@@ -472,12 +483,12 @@ SwapAnimation.prototype.step = function() {
     } else {
         if (this.moveTilesStep(-1)) {
             this.animationDone = true;
-            puzzleViewer.pivot.destroy();
-            puzzleViewer.pivot = null;
+            this.viewer.pivot.destroy();
+            this.viewer.pivot = null;
         }
     }
 
-    puzzleViewer.drawPuzzle();
+    this.viewer.drawPuzzle();
 
     if (this.animationDone) {
         clearInterval(this.id);
@@ -489,7 +500,7 @@ SwapAnimation.prototype.step = function() {
 
 SwapAnimation.prototype.moveTilesStep = function(direction) {
     var phaseStepsTotal = 30;
-    var pivot = puzzleViewer.pivot;
+    var pivot = this.viewer.pivot;
 
     this.phaseSteps++;
     pivot.sprites[0].x += direction * this.moveDeltaX / phaseStepsTotal;
@@ -502,7 +513,7 @@ SwapAnimation.prototype.moveTilesStep = function(direction) {
 
 SwapAnimation.prototype.swapTilesStep = function() {
     var phaseStepsTotal = 100;
-    var pivot = puzzleViewer.pivot;
+    var pivot = this.viewer.pivot;
 
     this.phaseSteps++;
     pivot.rotation = 180 * this.phaseSteps / phaseStepsTotal;
@@ -510,8 +521,38 @@ SwapAnimation.prototype.swapTilesStep = function() {
     return this.phaseSteps == phaseStepsTotal;
 }
 
+function SolveAnimation(viewer) {
+    this.viewer = viewer;
+    this.phaseSteps = 0;
+}
+
+SolveAnimation.prototype.go = function(callback) {
+    this.callback = callback;
+    var me = this;
+    this.id = setInterval(function() { me.step() }, 5);
+}
+
+SolveAnimation.prototype.step = function() {
+    var i;
+    var model = this.viewer.model;
+
+    this.phaseSteps++;
+    for (i = 0; i < model.numTiles; i++) {
+        var sign = (i % 2) * 2 - 1;
+        this.viewer.tileSprites[i].rotation =
+            this.phaseSteps * sign * (360 * 5 / 1000);
+    }
+
+    this.viewer.drawPuzzle();
+
+    if (this.phaseSteps == 1000) {
+        clearInterval(this.id);
+        this.callback();
+    }
+}
+
 function displayStatus(statusText) {
-    document.getElementById("status").innerHTML = statusText;
+    document.getElementById("status").innerHTML = "<center>" + statusText + "</center>";
 }
 
 function init() {
