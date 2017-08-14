@@ -1,7 +1,5 @@
 "use strict";
 
-var puzzleModel;
-var puzzleViewer;
 var puzzleControl;
 
 var TO_RADIANS = Math.PI/180;
@@ -660,11 +658,18 @@ function displayStatus(statusText) {
 }
 
 function init() {
-    puzzleModel = new PuzzleModel(3, 3);
-    puzzleViewer = new PuzzleViewer(puzzleModel);
+    var puzzleModel = new PuzzleModel(3, 3);
+    var puzzleViewer = new PuzzleViewer(puzzleModel);
     puzzleControl = new PuzzleControl(puzzleModel, puzzleViewer);
     puzzleViewer.drawPuzzle();
     displayStatus("Try me!");
 }
 
 init();
+
+// Export settings needed by the HTML page (so that they remain accessible after minification)
+window["puzzleControl"] = puzzleControl;
+PuzzleControl.prototype["resetPuzzle"] = PuzzleControl.prototype.resetPuzzle;
+PuzzleControl.prototype["undoMove"] = PuzzleControl.prototype.undoMove;
+PuzzleControl.prototype["replayMoves"] = PuzzleControl.prototype.replayMoves;
+PuzzleControl.prototype["movesFromCode"] = PuzzleControl.prototype.movesFromCode;
