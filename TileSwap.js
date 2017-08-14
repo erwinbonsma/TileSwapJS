@@ -71,6 +71,53 @@ MoveSequence.prototype.reset = function() {
     this.sequence = "";
 }
 
+MoveSequence.prototype.toBase64 = function() {
+    var code;
+    var salt = Math.floor(Math.random() * 256);
+    var codeMoveLen = Math.min(this.numMoves(), 255);
+    var i, v;
+    code = String.fromCharCode(salt);
+    code = code + String.fromCharCode(codeMoveLen);
+    for (i = 0; i < codeMoveLen; ) {
+        v = (this.sequence.charCodeAt(i++) - 65) << 4;
+        if (i < codeMoveLen) {
+            v += this.sequence.charCodeAt(i++) - 65;
+        }
+        code = code + (String.fromCharCode(v ^ salt));
+    }
+    return btoa(code);
+}
+
+MoveSequence.prototype.fromBase64 = function(base64Code) {
+    var code = atob(base64Code);
+    var salt, codeMoveLen;
+    var i, v;
+
+    this.sequence = "";
+
+    if (code.length < 2) {
+        console.log("Code too short");
+        return;
+    }
+    salt = code.charCodeAt(0);
+    codeMoveLen = code.charCodeAt(1);
+
+    if (code.length < 2 + Math.floor((codeMoveLen + 1) / 2)) {
+        console.log("Too few move characters");
+        return;
+    }
+
+    for (i = 0; i < codeMoveLen; ) {
+        v = code.charCodeAt(2 + i / 2) ^ salt;
+        this.sequence = this.sequence + String.fromCharCode(65 + ((v >> 4) & 15));
+        i++;
+        if (i < codeMoveLen) {
+            this.sequence = this.sequence + String.fromCharCode(65 + (v & 15));
+            i++;
+        }
+    }
+}
+
 function PuzzleModel(numCols, numRows) {
     this.numCols = numCols;
     this.numRows = numRows;
@@ -285,8 +332,8 @@ PuzzleControl.prototype.swapDone = function() {
     this.animation = null;
 
     document.getElementById("moves").value = this.model.moves.sequence;
-    if (this.model.isSolved() || this.model.moves.numMoves() > 2) {
-        displayStatus("Hurray!");
+    if (this.model.isSolved()) {
+        displayStatus("Well done!");
         var me = this;
         var callback = function() { me.solveAnimationDone(); };
         this.animation = new SolveAnimation(this.viewer);
@@ -300,6 +347,8 @@ PuzzleControl.prototype.solveAnimationDone = function() {
     this.animation = null;
 
     displayStatus("Solved in " + this.model.moves.numMoves() + " moves!");
+    var solveCode = this.model.moves.toBase64();
+    document.getElementById("solveCode").value = solveCode;
 }
 
 PuzzleControl.prototype.resetPuzzle = function() {
@@ -331,6 +380,20 @@ PuzzleControl.prototype.replayMoves = function() {
 
     var movesReplay = new MovesReplay(moves, this);
     movesReplay.replayNextMove();
+}
+
+// Set the moves field based on the code in the solveCode area.
+// A subsequent replay will then replay these.
+PuzzleControl.prototype.movesFromCode = function() {
+    if (this.animation) return;
+
+    var solveCode = document.getElementById("solveCode").value;
+    console.log("solveCode = " + solveCode);
+    var solveSequence = new MoveSequence(this.model);
+    solveSequence.fromBase64(solveCode);
+    console.log("sequence = " + solveSequence.sequence);
+
+    moves.sequence = document.getElementById("moves").value = solveSequence.sequence;
 }
 
 function MovesReplay(moves, puzzleControl) {
@@ -523,7 +586,8 @@ SwapAnimation.prototype.swapTilesStep = function() {
 
 function SolveAnimation(viewer) {
     this.viewer = viewer;
-    this.phaseSteps = 0;
+    this.steps = 0;
+    this.numSteps = 1000;
 }
 
 SolveAnimation.prototype.go = function(callback) {
@@ -536,16 +600,16 @@ SolveAnimation.prototype.step = function() {
     var i;
     var model = this.viewer.model;
 
-    this.phaseSteps++;
+    this.steps++;
     for (i = 0; i < model.numTiles; i++) {
         var sign = (i % 2) * 2 - 1;
         this.viewer.tileSprites[i].rotation =
-            this.phaseSteps * sign * (360 * 5 / 1000);
+            this.steps * sign * (360 * 5 / this.numSteps);
     }
 
     this.viewer.drawPuzzle();
 
-    if (this.phaseSteps == 1000) {
+    if (this.steps == this.numSteps) {
         clearInterval(this.id);
         this.callback();
     }

@@ -6,22 +6,21 @@
 
 <h1>Dancing Dice &amp; Dominoes</h1>
 
-<table>
+<table border="0">
     <tr><td><canvas id="puzzleCanvas" width="400" height="400"></canvas></td></tr>
-    <tr><td><p id="status">&nbsp;</p></td></tr>
+    <tr><td><div id="status">&nbsp;</div></td></tr>
+    <tr><td>
+        <button onclick="puzzleControl.resetPuzzle()">Reset</button>
+        <button onclick="puzzleControl.undoMove()">Undo</button>
+        <button onclick="puzzleControl.replayMoves()">Replay</button>
+    </td></tr>
+    <tr><td>
+        <center><textarea rows="4" cols="50" id="solveCode" style="resize:none;border:0"
+        onchange="puzzleControl.movesFromCode()"></textarea></center>
+    </td></tr>
 </table>
 
-<button onclick="puzzleControl.resetPuzzle()">Reset</button>
-<button onclick="puzzleControl.undoMove()">Undo</button>
-<button onclick="puzzleControl.replayMoves()">Replay</button>
-
-<br>
-<input type="text" id="moves" value="">
-
-<!--
-<button onclick="init()">Initialize</button>
--->
-
+<input type="text" id="moves" style="display:none"></input>
 </body>
 
 <script src="TileSwap.js"></script>

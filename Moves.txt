@@ -1,1 +1,6 @@
+Optimal solution:
 EMHKLDEJBDMJAKBHGLDNEJMEHNKNDG
+
+Two codes for the optimal solution:
+Qx4POfAKUIpJVCh+Coc+7nU=
+xB6IvneN1w3O06/5jQC5afI=
