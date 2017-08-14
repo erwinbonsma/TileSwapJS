@@ -17,6 +17,9 @@ function drawRoundedBox(ctx, x0, y0, w, h, r) {
     ctx.stroke();
 }
 
+/**
+ * @constructor
+ */
 function SwapPair(pos1, pos2) {
     this.pos1 = Math.min(pos1, pos2);
     this.pos2 = Math.max(pos1, pos2);
@@ -26,6 +29,9 @@ SwapPair.prototype.toString = function() {
     return "(" + this.pos1 + ", " + this.pos2 + ")";
 }
 
+/**
+ * @constructor
+ */
 function MoveSequence(puzzleModel) {
     this.model = puzzleModel;
     this.sequence = "";
@@ -120,6 +126,9 @@ MoveSequence.prototype.fromBase64 = function(base64Code) {
     }
 }
 
+/**
+ * @constructor
+ */
 function PuzzleModel(numCols, numRows) {
     this.numCols = numCols;
     this.numRows = numRows;
@@ -176,6 +185,9 @@ PuzzleModel.prototype.trySwapTiles = function(swapPair) {
     return false;
 }
 
+/**
+ * @constructor
+ */
 function PuzzleViewer(puzzleModel) {
     this.model = puzzleModel;
     this.tileElements = [];
@@ -272,8 +284,8 @@ PuzzleViewer.prototype.drawPuzzle = function() {
 }
 
 PuzzleViewer.prototype.swapPairAt = function(x, y) {
-    var x = x - this.tilePos0 + this.tileSize / 2;
-    var y = y - this.tilePos0 + this.tileSize / 2;
+    x = x - this.tilePos0 + this.tileSize / 2;
+    y = y - this.tilePos0 + this.tileSize / 2;
 
     var onCol = x % this.tileDistance < this.tileSize;
     var onRow = y % this.tileDistance < this.tileSize;
@@ -292,6 +304,9 @@ PuzzleViewer.prototype.swapPairAt = function(x, y) {
     }
 }
 
+/**
+ * @constructor
+ */
 function PuzzleControl(puzzleModel, puzzleViewer) {
     this.model = puzzleModel;
     this.viewer = puzzleViewer;
@@ -310,7 +325,7 @@ PuzzleControl.prototype.handleClick = function(evt) {
 
     var swapPair = this.viewer.swapPairAt(x, y);
     if (swapPair) {
-        this.trySwapTiles(swapPair);
+        this.trySwapTiles(swapPair, null);
     }
 }
 
@@ -367,7 +382,7 @@ PuzzleControl.prototype.undoMove = function() {
     var swapPair = this.model.moves.lastMove();
     if (swapPair) {
         console.log("Undoing " + swapPair);
-        this.trySwapTiles(swapPair);
+        this.trySwapTiles(swapPair, null);
     }
 }
 
@@ -395,9 +410,12 @@ PuzzleControl.prototype.movesFromCode = function() {
     solveSequence.fromBase64(solveCode);
     console.log("sequence = " + solveSequence.sequence);
 
-    moves.sequence = document.getElementById("moves").value = solveSequence.sequence;
+    document.getElementById("moves").value = solveSequence.sequence;
 }
 
+/**
+ * @constructor
+ */
 function MovesReplay(moves, puzzleControl) {
     this.moves = moves;
     this.control = puzzleControl;
@@ -419,6 +437,9 @@ MovesReplay.prototype.replayNextMove = function() {
     }
 }
 
+/**
+ * @constructor
+ */
 function Sprite() {
     this.x = 0;
     this.y = 0;
@@ -437,6 +458,13 @@ Sprite.prototype.draw = function(ctx) {
     ctx.restore();
 }
 
+// Meant to be overridden
+Sprite.prototype.basicDraw = function(ctx) {}
+
+/**
+ * @constructor
+ * @extends {Sprite}
+ */
 function TileSprite(dots, puzzleViewer) {
     Sprite.call(this);
 
@@ -470,7 +498,11 @@ TileSprite.prototype.basicDraw = function(ctx) {
     }
 }
 
-function Pivot(tileSprite1, tileSprite2) {
+/**
+ * @constructor
+ * @extends {Sprite}
+ */
+function Pivot() {
     Sprite.call(this);
 
     this.sprites = [];
@@ -500,6 +532,9 @@ Pivot.prototype.destroy = function() {
     this.sprites = null;
 }
 
+/**
+ * @constructor
+ */
 function SwapAnimation(tileSprite1, tileSprite2, viewer) {
     this.viewer = viewer;
 
@@ -586,6 +621,9 @@ SwapAnimation.prototype.swapTilesStep = function() {
     return this.phaseSteps == phaseStepsTotal;
 }
 
+/**
+ * @constructor
+ */
 function SolveAnimation(viewer) {
     this.viewer = viewer;
     this.steps = 0;
