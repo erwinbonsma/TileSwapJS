@@ -2,6 +2,10 @@
 
 var puzzleControl;
 
+// Global to make it harder to generate unique solve codes. Otherwise a simple undo/redo after
+// solving generates a new solve code each time.
+var salt = Math.floor(Math.random() * 256);
+
 var TO_RADIANS = Math.PI/180;
 
 function drawRoundedBox(ctx, x0, y0, w, h, r) {
@@ -79,10 +83,9 @@ MoveSequence.prototype.reset = function() {
 
 MoveSequence.prototype.toBase64 = function() {
     var code;
-    var salt = Math.floor(Math.random() * 256);
     var codeMoveLen = Math.min(this.numMoves(), 255);
     var i, v;
-    code = String.fromCharCode(salt);
+    code = String.fromCharCode(salt);  // Use global "salt" var
     code = code + String.fromCharCode(codeMoveLen);
     for (i = 0; i < codeMoveLen; ) {
         v = (this.sequence.charCodeAt(i++) - 65) << 4;
@@ -96,7 +99,7 @@ MoveSequence.prototype.toBase64 = function() {
 
 MoveSequence.prototype.fromBase64 = function(base64Code) {
     var code = atob(base64Code);
-    var salt, codeMoveLen;
+    var codeMoveLen;
     var i, v;
 
     this.sequence = "";
@@ -105,7 +108,7 @@ MoveSequence.prototype.fromBase64 = function(base64Code) {
         console.log("Code too short");
         return;
     }
-    salt = code.charCodeAt(0);
+    salt = code.charCodeAt(0); // Use global "salt" var
     codeMoveLen = code.charCodeAt(1);
 
     if (code.length < 2 + Math.floor((codeMoveLen + 1) / 2)) {
