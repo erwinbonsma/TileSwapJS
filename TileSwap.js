@@ -142,10 +142,16 @@ function PuzzleModel(numCols, numRows) {
 
 PuzzleModel.prototype.reset = function() {
     var i;
+    var changed = false;
     for (i = 0; i < this.numTiles; i++) {
-        this.tiles[i] = this.numTiles - i - 1;
+        var newValue = this.numTiles - i - 1;
+        if (this.tiles[i] != newValue) {
+            this.tiles[i] = newValue;
+            changed = true;
+        }
     }
     this.moves.reset();
+    return changed;
 }
 
 PuzzleModel.prototype.isSolved = function() {
@@ -282,7 +288,7 @@ PuzzleViewer.prototype.drawPuzzle = function() {
 
     for (i = 0; i < this.model.numTiles; i++) {
         var sprite = this.tileSprites[this.model.tileAt(i)];
-        if ( !sprite.isPivotting ) {
+        if ( sprite.parent == this ) {
             this.drawTile(ctx, sprite, i);
         }
     }
@@ -380,13 +386,20 @@ PuzzleControl.prototype.solveAnimationDone = function() {
 PuzzleControl.prototype.resetPuzzle = function(callback) {
     if (this.animation) return;
 
-    this.model.reset();
-    this.animation = new ResetAnimation(this.viewer);
+    displayStatus("Resetting");
+
     if (!callback) {
         var me = this;
         callback = function() { me.resetAnimationDone(); };
     }
-    this.animation.go(callback);
+    if (this.model.reset()) {
+        this.animation = new ResetAnimation(this.viewer);
+        this.animation.go(callback);
+    }
+    else {
+        // No change. Don't animate. Invoke callback immediately.
+        callback();
+    }
 }
 
 PuzzleControl.prototype.resetAnimationDone = function() {
@@ -463,10 +476,11 @@ MovesReplay.prototype.replayNextMove = function() {
 /**
  * @constructor
  */
-function Sprite() {
+function Sprite(parent) {
     this.x = 0;
     this.y = 0;
     this.rotation = 0;
+    this.parent = parent;
 }
 
 // Draws the sprite, taking into account position and rotation
@@ -489,7 +503,7 @@ Sprite.prototype.basicDraw = function(ctx) {}
  * @extends {Sprite}
  */
 function TileSprite(dots, puzzleViewer) {
-    Sprite.call(this);
+    Sprite.call(this, puzzleViewer);
 
     this.dots = dots;
     this.viewer = puzzleViewer;
@@ -525,8 +539,8 @@ TileSprite.prototype.basicDraw = function(ctx) {
  * @constructor
  * @extends {Sprite}
  */
-function Pivot() {
-    Sprite.call(this);
+function Pivot(parent) {
+    Sprite.call(this, parent);
 
     this.sprites = [];
 }
@@ -540,7 +554,7 @@ Pivot.prototype.basicDraw = function(ctx) {
 }
 
 Pivot.prototype.addSprite = function(sprite) {
-    sprite.isPivotting = true;
+    sprite.parent = this;
 
     this.sprites.push(sprite);
     sprite.x -= this.x;
@@ -550,7 +564,7 @@ Pivot.prototype.addSprite = function(sprite) {
 Pivot.prototype.destroy = function() {
     var i;
     for (i = 0; i < this.sprites.length; i++) {
-        this.sprites[i].isPivotting = false;
+        this.sprites[i].parent = this.parent;
     }
     this.sprites = null;
 }
@@ -561,7 +575,7 @@ Pivot.prototype.destroy = function() {
 function SwapAnimation(tileSprite1, tileSprite2, viewer) {
     this.viewer = viewer;
 
-    var pivot = new Pivot();
+    var pivot = new Pivot(this.viewer);
     pivot.x = (tileSprite1.x + tileSprite2.x) / 2;
     pivot.y = (tileSprite1.y + tileSprite2.y) / 2;
     pivot.addSprite(tileSprite1);
@@ -685,12 +699,13 @@ function ResetAnimation(viewer) {
     this.viewer = viewer;
     this.steps = 0;
     this.numSteps = 200;
-    this.viewer.pivot = new Pivot();
+
+    viewer.pivot = new Pivot(viewer);
 
     var i;
     var numTiles = viewer.model.numTiles;
     for (i = 0; i < numTiles; i++) {
-        this.viewer.pivot.addSprite(viewer.tileSprites[i]);
+        viewer.pivot.addSprite(viewer.tileSprites[i]);
     }
 }
 
