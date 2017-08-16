@@ -256,9 +256,17 @@ PuzzleViewer.prototype.drawFrame = function(ctx) {
     );
 }
 
+PuzzleViewer.prototype.xPosOfTileAt = function(tileIndex) {
+    return this.tilePos0 + (tileIndex % this.model.numCols) * this.tileDistance;
+}
+
+PuzzleViewer.prototype.yPosOfTileAt = function(tileIndex) {
+    return this.tilePos0 + Math.floor(tileIndex / this.model.numCols) * this.tileDistance;
+}
+
 PuzzleViewer.prototype.drawTile = function(ctx, sprite, tileIndex) {
-    sprite.x = this.tilePos0 + (tileIndex % this.model.numCols) * this.tileDistance;
-    sprite.y = this.tilePos0 + Math.floor(tileIndex / this.model.numCols) * this.tileDistance;
+    sprite.x = this.xPosOfTileAt(tileIndex);
+    sprite.y = this.yPosOfTileAt(tileIndex);
     sprite.draw(ctx);
 }
 
@@ -369,10 +377,21 @@ PuzzleControl.prototype.solveAnimationDone = function() {
     document.getElementById("solveCode").value = solveCode;
 }
 
-PuzzleControl.prototype.resetPuzzle = function() {
+PuzzleControl.prototype.resetPuzzle = function(callback) {
     if (this.animation) return;
 
     this.model.reset();
+    this.animation = new ResetAnimation(this.viewer);
+    if (!callback) {
+        var me = this;
+        callback = function() { me.resetAnimationDone(); };
+    }
+    this.animation.go(callback);
+}
+
+PuzzleControl.prototype.resetAnimationDone = function() {
+    this.animation = null;
+
     this.viewer.drawPuzzle();
     displayStatus("Try again!");
 }
@@ -390,14 +409,12 @@ PuzzleControl.prototype.undoMove = function() {
 PuzzleControl.prototype.replayMoves = function() {
     if (this.animation) return;
 
-    this.resetPuzzle();
-
     // Take from input field, so that user can inject sequence
     var moves = new MoveSequence(this.model);
     moves.sequence = document.getElementById("moves").value;
 
     var movesReplay = new MovesReplay(moves, this);
-    movesReplay.replayNextMove();
+    movesReplay.go();
 }
 
 // Set the moves field based on the code in the solveCode area.
@@ -422,6 +439,11 @@ function MovesReplay(moves, puzzleControl) {
     this.control = puzzleControl;
 }
 
+MovesReplay.prototype.go = function() {
+    var me = this;
+    this.control.resetPuzzle(function() { me.replayNextMove(); });
+}
+
 MovesReplay.prototype.replayNextMove = function() {
     var movesSofar = this.control.model.moves.numMoves();
     if (movesSofar == this.moves.numMoves()) {
@@ -433,7 +455,7 @@ MovesReplay.prototype.replayNextMove = function() {
         // Replay next move
         this.control.trySwapTiles(
             this.moves.moveAt(movesSofar),
-            function() { me.replayNextMove() }
+            function() { me.replayNextMove(); }
         );
     }
 }
@@ -639,10 +661,10 @@ SolveAnimation.prototype.go = function(callback) {
 
 SolveAnimation.prototype.step = function() {
     var i;
-    var model = this.viewer.model;
+    var numTiles = this.viewer.model.numTiles;
 
     this.steps++;
-    for (i = 0; i < model.numTiles; i++) {
+    for (i = 0; i < numTiles; i++) {
         var sign = (i % 2) * 2 - 1;
         this.viewer.tileSprites[i].rotation =
             this.steps * sign * (360 * 5 / this.numSteps);
@@ -651,6 +673,53 @@ SolveAnimation.prototype.step = function() {
     this.viewer.drawPuzzle();
 
     if (this.steps == this.numSteps) {
+        clearInterval(this.id);
+        this.callback();
+    }
+}
+
+/**
+ * @constructor
+ */
+function ResetAnimation(viewer) {
+    this.viewer = viewer;
+    this.steps = 0;
+    this.numSteps = 200;
+    this.viewer.pivot = new Pivot();
+
+    var i;
+    var numTiles = viewer.model.numTiles;
+    for (i = 0; i < numTiles; i++) {
+        this.viewer.pivot.addSprite(viewer.tileSprites[i]);
+    }
+}
+
+ResetAnimation.prototype.go = function(callback) {
+    this.callback = callback;
+    var me = this;
+    this.id = setInterval(function() { me.step() }, 5);
+}
+
+ResetAnimation.prototype.step = function() {
+    var i;
+    var model = this.viewer.model;
+    var delta = 1 / (this.numSteps - this.steps);
+
+    this.steps++;
+    for (i = 0; i < model.numTiles; i++) {
+        var tileIndex = model.tileAt(i);
+        this.viewer.tileSprites[tileIndex].x +=
+            (this.viewer.xPosOfTileAt(i) - this.viewer.tileSprites[tileIndex].x) * delta;
+        this.viewer.tileSprites[tileIndex].y +=
+            (this.viewer.yPosOfTileAt(i) - this.viewer.tileSprites[tileIndex].y) * delta;
+    }
+
+    this.viewer.drawPuzzle();
+
+    if (this.steps == this.numSteps) {
+        this.viewer.pivot.destroy();
+        this.viewer.pivot = null;
+
         clearInterval(this.id);
         this.callback();
     }
