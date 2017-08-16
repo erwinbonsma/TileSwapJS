@@ -1,24 +1,64 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>Dancing Dice &amp; Dominoes</title>
+<link rel="stylesheet" href="css/bootstrap.min.css">
+<link rel="stylesheet" href="css/docs.min.css">
+<style>
+.my-container .row+.row {
+    margin-top:1rem;
+}
+
+.my-container .row>.col,
+.my-container .row>[class^=col-]{
+	padding-top:.75rem;
+	padding-bottom:.75rem;
+}
+</style>
 </head>
 <body>
 
-<h1>Dancing Dice &amp; Dominoes</h1>
-
-<table border="0">
-    <tr><td><canvas id="puzzleCanvas" width="400" height="400"></canvas></td></tr>
-    <tr><td><div id="status">&nbsp;</div></td></tr>
-    <tr><td>
-        <button onclick="puzzleControl.resetPuzzle()">Reset</button>
-        <button onclick="puzzleControl.undoMove()">Undo</button>
-        <button onclick="puzzleControl.replayMoves()">Replay</button>
-    </td></tr>
-    <tr><td>
-        <center><textarea rows="4" cols="50" id="solveCode" style="resize:none;border:0"
-        onchange="puzzleControl.movesFromCode()"></textarea></center>
-    </td></tr>
-</table>
+<div class="container my-container">
+    <!--
+    Two possible layouts:
+        Small screens: Buttons are underneath canvas, next to each other
+        Larger screens: Buttons are next to canvans, underneath each other
+    -->
+    <div class="row">
+        <div class="col-12 col-md-9">
+            <center><h1>Dancing Dice &amp; Dominoes</h1></center>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-12 col-md-9">
+            <center><canvas id="puzzleCanvas" width="400" height="400"></canvas></center>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="row">
+                <div class="col col-md-12">
+                    <button onclick="puzzleControl.resetPuzzle()" class="btn btn-primary btn-block">Reset</button>
+                </div>
+                <div class="col col-md-12">
+                    <button onclick="puzzleControl.undoMove()" class="btn btn-primary btn-block">Undo</button>
+                </div>
+                <div class="col col-md-12">
+                    <button onclick="puzzleControl.replayMoves()" class="btn btn-primary btn-block">Replay</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div id="status" class="col-12 col-md-9">&nbsp;</div>
+    </div>
+    <div class="row">
+        <div class="col-12 col-md-9">
+            <center><textarea rows="4" cols="50" id="solveCode" style="resize:none;border:0"
+            onchange="puzzleControl.movesFromCode()"></textarea></center>
+        </div>
+    </div>
+</div>
 
 <input type="text" id="moves" style="display:none"></input>
 </body>
