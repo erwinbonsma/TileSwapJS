@@ -1,0 +1,9 @@
+# Settings
+JRE=~/bin/jre1.8.0_144.jre/Contents/Home/bin/java
+CLOSURE=/Users/erwin/bin/closure/closure-compiler-v20170806.jar
+
+# Verifying correctness
+${JRE} -jar ${CLOSURE} --checks_only --warning_level VERBOSE --js TileSwap.js
+
+# Minifying
+${JRE} -jar ${CLOSURE} --warning_level VERBOSE --compilation_level ADVANCED --js_output_file TileSwap.min.js --js TileSwap.js
