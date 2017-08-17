@@ -373,6 +373,7 @@ PuzzleControl.prototype.swapDone = function() {
     } else {
         displayStatus(this.model.moves.numMoves() + " moves");
     }
+    updateButtons();
 }
 
 PuzzleControl.prototype.solveAnimationDone = function() {
@@ -407,6 +408,7 @@ PuzzleControl.prototype.resetAnimationDone = function() {
 
     this.viewer.drawPuzzle();
     displayStatus("Try again!");
+    updateButtons();
 }
 
 PuzzleControl.prototype.undoMove = function() {
@@ -442,6 +444,7 @@ PuzzleControl.prototype.movesFromCode = function() {
     console.log("sequence = " + solveSequence.sequence);
 
     document.getElementById("moves").value = solveSequence.sequence;
+    updateButtons();
 }
 
 /**
@@ -744,12 +747,21 @@ function displayStatus(statusText) {
     document.getElementById("status").innerHTML = "<center>" + statusText + "</center>";
 }
 
+function updateButtons() {
+    var movesPerformed = puzzleControl.model.moves.numMoves() > 0;
+    var movesExist = document.getElementById("moves").value.length > 0;
+    document.getElementById("reset-button").disabled = !movesPerformed;
+    document.getElementById("undo-button").disabled = !movesPerformed;
+    document.getElementById("replay-button").disabled = !movesExist;
+}
+
 function init() {
     var puzzleModel = new PuzzleModel(3, 3);
     var puzzleViewer = new PuzzleViewer(puzzleModel);
     puzzleControl = new PuzzleControl(puzzleModel, puzzleViewer);
     puzzleViewer.drawPuzzle();
     displayStatus("Try me!");
+    updateButtons();
 }
 
 init();
